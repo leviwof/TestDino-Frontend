@@ -11,9 +11,14 @@ export default function NewKitPage() {
         title="New Kit"
         description="Tell us about the role and we'll build a tailored prep kit."
         action={
-          <LinkButton href="/kits" variant="secondary">
-            Back to kits
-          </LinkButton>
+          <div className="flex gap-2">
+            <LinkButton href="/kits/batch" variant="secondary">
+              Batch upload
+            </LinkButton>
+            <LinkButton href="/kits" variant="secondary">
+              Back to kits
+            </LinkButton>
+          </div>
         }
       />
 

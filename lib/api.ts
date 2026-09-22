@@ -461,6 +461,75 @@ export async function createKit(input: CreateKitInput): Promise<CreateKitResult>
   return { kitId: body.kitId, jobId: body.jobId, status: body.status };
 }
 
+// ---- Batch create ----
+
+export interface BatchKitItem {
+  jd: string;
+  company_url: string;
+  days: number;
+  title?: string;
+}
+
+export interface BatchResultItem {
+  index: number;
+  ok: boolean;
+  kitId?: string;
+  jobId?: string;
+  status?: string;
+  existed?: boolean;
+  company_url: string;
+  error?: string;
+  message?: string;
+}
+
+export interface BatchResult {
+  total: number;
+  created: number;
+  duplicates: number;
+  failed: number;
+  results: BatchResultItem[];
+}
+
+/** POST /kits/batch — create many kits at once from a list of pairs. */
+export async function createKitsBatch(items: BatchKitItem[]): Promise<BatchResult> {
+  const headers = await getAuthHeaders();
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/kits/batch`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...headers },
+      body: JSON.stringify({ items }),
+    });
+  } catch {
+    throw new ApiError(
+      "Could not reach the server. Check your connection and try again.",
+      0,
+      "network_error",
+    );
+  }
+
+  type BatchResponse = Partial<BatchResult> & {
+    error?: { code?: string; message?: string };
+  };
+  let body: BatchResponse | null = null;
+  try {
+    body = (await res.json()) as BatchResponse;
+  } catch {
+    body = null;
+  }
+
+  if (!res.ok) {
+    throw new ApiError(messageForError(res.status, body), res.status, body?.error?.code);
+  }
+  return {
+    total: body?.total ?? items.length,
+    created: body?.created ?? 0,
+    duplicates: body?.duplicates ?? 0,
+    failed: body?.failed ?? 0,
+    results: body?.results ?? [],
+  };
+}
+
 // ---- Practice Mode ----
 
 export interface PracticeItem {
