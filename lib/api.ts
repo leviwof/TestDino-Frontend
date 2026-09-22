@@ -17,55 +17,154 @@ export class ApiError extends Error {
   }
 }
 
-/** Ensure an authenticated session token exists, auto-provisioning a candidate session if needed. */
-export async function getOrProvisionToken(): Promise<string | null> {
-  if (typeof window === "undefined") return null;
-  let token = window.localStorage.getItem("testdino_token");
-  if (token) return token;
+const TOKEN_KEY = "testdino_token";
+/** Fired on the window whenever the stored token changes (login/logout). */
+export const AUTH_CHANGED_EVENT = "testdino-auth-changed";
 
+/** Read the stored auth token (browser only). */
+export function getToken(): string | null {
+  if (typeof window === "undefined") return null;
   try {
-    const email = `candidate_${Date.now()}_${Math.random().toString(36).substring(2, 6)}@testdino.local`;
-    const password = `Candidate_${Date.now()}!`;
-    const regRes = await fetch(`${API_BASE_URL}/auth/register`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email, password, name: "Candidate" }),
-    });
-    if (regRes.ok) {
-      const loginRes = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      if (loginRes.ok) {
-        const data = await loginRes.json();
-        if (data.token) {
-          window.localStorage.setItem("testdino_token", data.token);
-          return data.token;
-        }
-      }
-    }
+    return window.localStorage.getItem(TOKEN_KEY);
   } catch {
-    // Network/server offline; proceed so standard error flow handles it
+    return null;
   }
-  return null;
+}
+
+/** Persist the auth token and notify listeners (e.g. the header). */
+export function setToken(token: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(TOKEN_KEY, token);
+    window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
+  } catch {
+    // ignore storage failures
+  }
+}
+
+/** Clear the auth token (logout) and notify listeners. */
+export function clearToken(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(TOKEN_KEY);
+    window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
+  } catch {
+    // ignore
+  }
+}
+
+/** True when a token is present (does not verify it server-side). */
+export function isAuthenticated(): boolean {
+  return getToken() !== null;
 }
 
 /** Bearer token headers for authenticated requests (synchronous). */
 export function authHeaders(): Record<string, string> {
-  if (typeof window === "undefined") return {};
-  const token = window.localStorage.getItem("testdino_token");
+  const token = getToken();
   return token ? { authorization: `Bearer ${token}` } : {};
 }
 
-/** Bearer token headers for authenticated requests (async with auto-provisioning). */
+/**
+ * Async variant kept for call-site compatibility. Unlike before, it does NOT
+ * auto-provision an anonymous account — the user must log in.
+ */
 export async function getAuthHeaders(): Promise<Record<string, string>> {
-  if (typeof window === "undefined") return {};
-  let token = window.localStorage.getItem("testdino_token");
-  if (!token) {
-    token = await getOrProvisionToken();
+  return authHeaders();
+}
+
+// ---- Auth ----
+
+export interface AuthUser {
+  id: string;
+  email: string;
+}
+
+/** POST /auth/register — create an account (does not log in). */
+export async function registerUser(input: {
+  email: string;
+  password: string;
+}): Promise<AuthUser> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/auth/register`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input),
+    });
+  } catch {
+    throw new ApiError(
+      "Could not reach the server. Check your connection and try again.",
+      0,
+      "network_error",
+    );
   }
-  return token ? { authorization: `Bearer ${token}` } : {};
+  const body = await res.json().catch(() => null);
+  if (!res.ok) {
+    const message =
+      res.status === 409
+        ? "An account with that email already exists. Try logging in."
+        : messageForError(res.status, body);
+    throw new ApiError(message, res.status, body?.error?.code);
+  }
+  return body.user as AuthUser;
+}
+
+/** POST /auth/login — authenticate and store the token. */
+export async function login(input: {
+  email: string;
+  password: string;
+}): Promise<AuthUser> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input),
+    });
+  } catch {
+    throw new ApiError(
+      "Could not reach the server. Check your connection and try again.",
+      0,
+      "network_error",
+    );
+  }
+  const body = await res.json().catch(() => null);
+  if (!res.ok) {
+    const message =
+      res.status === 401
+        ? "Incorrect email or password."
+        : messageForError(res.status, body);
+    throw new ApiError(message, res.status, body?.error?.code);
+  }
+  if (!body?.token) {
+    throw new ApiError("Unexpected response from the server.", res.status);
+  }
+  setToken(body.token);
+  return body.user as AuthUser;
+}
+
+/** Clear the current session. */
+export function logout(): void {
+  clearToken();
+}
+
+/** GET /auth/me — the current user, or null if not authenticated. */
+export async function getCurrentUser(): Promise<AuthUser | null> {
+  const token = getToken();
+  if (!token) return null;
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/auth/me`, { headers: authHeaders() });
+  } catch {
+    return null;
+  }
+  if (res.status === 401) {
+    clearToken();
+    return null;
+  }
+  if (!res.ok) return null;
+  const body = await res.json().catch(() => null);
+  return (body?.user as AuthUser) ?? null;
 }
 
 /** Human-friendly message per failure, preferring a safe server message. */

@@ -2,6 +2,7 @@ import { Card } from "@/components/Card";
 import { LinkButton } from "@/components/LinkButton";
 import { NewKitForm } from "@/components/NewKitForm";
 import { PageHeader } from "@/components/PageHeader";
+import { RequireAuth } from "@/components/RequireAuth";
 
 export default function NewKitPage() {
   return (
@@ -16,9 +17,11 @@ export default function NewKitPage() {
         }
       />
 
-      <Card>
-        <NewKitForm />
-      </Card>
+      <RequireAuth>
+        <Card>
+          <NewKitForm />
+        </Card>
+      </RequireAuth>
     </div>
   );
 }

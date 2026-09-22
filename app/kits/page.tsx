@@ -8,7 +8,8 @@ import { EmptyState } from "@/components/EmptyState";
 import { LinkButton } from "@/components/LinkButton";
 import { Loading } from "@/components/Loading";
 import { PageHeader } from "@/components/PageHeader";
-import { ApiError, listKits, type KitSummary } from "@/lib/api";
+import { RequireAuth } from "@/components/RequireAuth";
+import { ApiError, isAuthenticated, listKits, type KitSummary } from "@/lib/api";
 
 /** Bare host for a company URL, without the www. prefix. */
 function hostOf(url?: string): string {
@@ -47,6 +48,8 @@ export default function KitsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Skip the fetch when unauthenticated; RequireAuth handles the redirect.
+    if (!isAuthenticated()) return;
     let active = true;
     (async () => {
       try {
@@ -75,6 +78,7 @@ export default function KitsPage() {
         action={<LinkButton href="/kits/new">New kit</LinkButton>}
       />
 
+      <RequireAuth>
       {kits === null ? (
         <Loading message="Loading your kits..." />
       ) : error ? (
@@ -132,6 +136,7 @@ export default function KitsPage() {
           })}
         </ul>
       )}
+      </RequireAuth>
     </div>
   );
 }
