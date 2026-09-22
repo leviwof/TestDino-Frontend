@@ -18,6 +18,7 @@ import { Section } from "@/components/Section";
 import { QuestionItem } from "@/components/QuestionItem";
 import { AddQuestionForm } from "@/components/AddQuestionForm";
 import { Loading } from "@/components/Loading";
+import { reorderQuestions } from "@/lib/questionApi";
 
 interface LoadError {
   message: string;
@@ -63,22 +64,36 @@ function QuestionList({
   kitId,
   questions,
   onQuestionUpdated,
+  onQuestionDeleted,
+  onSwap,
 }: {
   kitId: string;
   questions: KitQuestion[];
   onQuestionUpdated: (updated: KitQuestion) => void;
+  onQuestionDeleted: (id: string) => void;
+  /** Swap the order of two questions (the item and its rendered neighbour). */
+  onSwap: (idA: string, idB: string) => void;
 }) {
   if (questions.length === 0) {
     return <p className="text-sm text-slate-500">No questions in this section.</p>;
   }
   return (
     <ul className="flex flex-col gap-3">
-      {questions.map((q) => (
+      {questions.map((q, i) => (
         <li key={q.id}>
           <QuestionItem
             kitId={kitId}
             question={q}
             onQuestionUpdated={onQuestionUpdated}
+            onQuestionDeleted={onQuestionDeleted}
+            canMoveUp={i > 0}
+            canMoveDown={i < questions.length - 1}
+            onMoveUp={i > 0 ? () => onSwap(q.id, questions[i - 1].id) : undefined}
+            onMoveDown={
+              i < questions.length - 1
+                ? () => onSwap(q.id, questions[i + 1].id)
+                : undefined
+            }
           />
         </li>
       ))}
@@ -207,6 +222,30 @@ export function KitDetailsView({ kitId }: { kitId: string }) {
     });
     // Switch to questions tab when new question is added
     setActiveTab("questions");
+  };
+
+  const handleQuestionDeleted = (id: string) => {
+    setKit((prev) => {
+      if (!prev?.questions) return prev;
+      return { ...prev, questions: prev.questions.filter((q) => q.id !== id) };
+    });
+  };
+
+  // Swap two questions' positions (optimistic) and persist the full new order.
+  const handleSwap = async (idA: string, idB: string) => {
+    const current = kit?.questions ?? [];
+    const arr = [...current];
+    const ia = arr.findIndex((q) => q.id === idA);
+    const ib = arr.findIndex((q) => q.id === idB);
+    if (ia < 0 || ib < 0) return;
+    [arr[ia], arr[ib]] = [arr[ib], arr[ia]];
+    setKit((prev) => (prev ? { ...prev, questions: arr } : prev));
+    try {
+      await reorderQuestions(kitId, arr.map((q) => q.id));
+    } catch {
+      // Revert on failure.
+      setKit((prev) => (prev ? { ...prev, questions: current } : prev));
+    }
   };
 
   // Filtered questions computation for easy scanning
@@ -726,6 +765,8 @@ export function KitDetailsView({ kitId }: { kitId: string }) {
                       kitId={kitId}
                       questions={inCategory}
                       onQuestionUpdated={handleQuestionUpdated}
+                      onQuestionDeleted={handleQuestionDeleted}
+                      onSwap={handleSwap}
                     />
                   </Section>
                 );
@@ -741,6 +782,8 @@ export function KitDetailsView({ kitId }: { kitId: string }) {
                 kitId={kitId}
                 questions={filteredQuestions}
                 onQuestionUpdated={handleQuestionUpdated}
+                onQuestionDeleted={handleQuestionDeleted}
+                onSwap={handleSwap}
               />
             </div>
           )}

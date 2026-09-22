@@ -21,6 +21,11 @@ interface QuestionItemProps {
   kitId: string;
   question: KitQuestion;
   onQuestionUpdated: (updated: KitQuestion) => void;
+  onQuestionDeleted?: (id: string) => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
   apiHandlers?: QuestionApiHandlers;
   initiallyExpanded?: boolean;
 }
@@ -29,6 +34,11 @@ export function QuestionItem({
   kitId,
   question,
   onQuestionUpdated,
+  onQuestionDeleted,
+  onMoveUp,
+  onMoveDown,
+  canMoveUp = false,
+  canMoveDown = false,
   apiHandlers = defaultQuestionApiHandlers,
   initiallyExpanded = true,
 }: QuestionItemProps) {
@@ -36,6 +46,8 @@ export function QuestionItem({
   const [expanded, setExpanded] = useState(initiallyExpanded);
   const [saving, setSaving] = useState(false);
   const [pinning, setPinning] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{
     type: "success" | "error";
     text: string;
@@ -116,6 +128,22 @@ export function QuestionItem({
       setStatusMessage({ type: "error", text: message });
     } finally {
       setPinning(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    setStatusMessage(null);
+    try {
+      await apiHandlers.deleteQuestion(kitId, question.id);
+      onQuestionDeleted?.(question.id);
+      // Parent removes this item from the list; no further state needed.
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to delete question.";
+      setStatusMessage({ type: "error", text: message });
+      setDeleting(false);
+      setConfirmingDelete(false);
     }
   };
 
@@ -302,6 +330,62 @@ export function QuestionItem({
               >
                 Edit
               </button>
+
+              {onMoveUp ? (
+                <button
+                  type="button"
+                  onClick={onMoveUp}
+                  disabled={!canMoveUp}
+                  aria-label="Move question up"
+                  className="inline-flex items-center justify-center rounded border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  ↑
+                </button>
+              ) : null}
+              {onMoveDown ? (
+                <button
+                  type="button"
+                  onClick={onMoveDown}
+                  disabled={!canMoveDown}
+                  aria-label="Move question down"
+                  className="inline-flex items-center justify-center rounded border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  ↓
+                </button>
+              ) : null}
+
+              {onQuestionDeleted ? (
+                confirmingDelete ? (
+                  <span className="inline-flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={handleDelete}
+                      disabled={deleting}
+                      aria-label="Confirm delete question"
+                      className="inline-flex items-center justify-center rounded bg-red-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-60"
+                    >
+                      {deleting ? "Deleting…" : "Confirm"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmingDelete(false)}
+                      disabled={deleting}
+                      className="inline-flex items-center justify-center rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                    >
+                      Cancel
+                    </button>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingDelete(true)}
+                    aria-label="Delete question"
+                    className="inline-flex items-center justify-center rounded border border-red-200 bg-white px-2.5 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50"
+                  >
+                    Delete
+                  </button>
+                )
+              ) : null}
             </div>
           </div>
 

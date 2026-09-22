@@ -100,6 +100,36 @@ export interface QuestionApiHandlers {
     kitId: string,
     input: NewQuestionInput,
   ) => Promise<KitQuestion>;
+  deleteQuestion: (kitId: string, questionId: string) => Promise<void>;
+}
+
+/** PATCH /kits/:id/reorder — persist a new question order (list of ids). */
+export async function reorderQuestions(
+  kitId: string,
+  orderedIds: string[],
+): Promise<void> {
+  const headers = await getAuthHeaders();
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/kits/${encodeURIComponent(kitId)}/reorder`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json", ...headers },
+      body: JSON.stringify({ order: orderedIds }),
+    });
+  } catch {
+    throw new ApiError(
+      "Could not reach the server. Check your connection and try again.",
+      0,
+      "network_error",
+    );
+  }
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => null);
+    throw new ApiError(
+      errBody?.error?.message ?? "Failed to reorder questions.",
+      res.status,
+    );
+  }
 }
 
 export const defaultQuestionApiHandlers: QuestionApiHandlers = {
@@ -183,5 +213,21 @@ export const defaultQuestionApiHandlers: QuestionApiHandlers = {
       }
     }
     return buildUserQuestion(input);
+  },
+
+  async deleteQuestion(kitId, questionId) {
+    if (typeof window === "undefined") return;
+    const headers = await getAuthHeaders();
+    const res = await fetch(
+      `${API_BASE_URL}/kits/${encodeURIComponent(kitId)}/questions/${encodeURIComponent(questionId)}`,
+      { method: "DELETE", headers },
+    );
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => null);
+      throw new ApiError(
+        errBody?.error?.message ?? "Failed to delete question.",
+        res.status,
+      );
+    }
   },
 };
