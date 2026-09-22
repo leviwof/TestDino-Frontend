@@ -24,7 +24,7 @@ interface LoadError {
   status: number;
 }
 
-type TabKey = "overview" | "requirements" | "questions" | "schedule";
+type TabKey = "overview" | "requirements" | "questions" | "flashcards" | "schedule";
 
 const QUESTION_SECTIONS: { category: string; title: string }[] = [
   { category: "technical", title: "Technical Questions" },
@@ -184,6 +184,7 @@ export function KitDetailsView({ kitId }: { kitId: string }) {
 
   const questions = kit?.questions ?? [];
   const requirements = kit?.role?.requirements ?? [];
+  const flashcards = kit?.flashcards ?? [];
 
   const handleQuestionUpdated = (updated: KitQuestion) => {
     setKit((prev) => {
@@ -313,6 +314,7 @@ export function KitDetailsView({ kitId }: { kitId: string }) {
     { key: "overview", label: "Overview" },
     { key: "requirements", label: "Requirements", count: requirements.length },
     { key: "questions", label: "Questions", count: questions.length },
+    { key: "flashcards", label: "Flashcards", count: flashcards.length },
     { key: "schedule", label: "Schedule", count: kit.schedule?.days?.length },
   ];
 
@@ -742,6 +744,60 @@ export function KitDetailsView({ kitId }: { kitId: string }) {
               />
             </div>
           )}
+        </div>
+      )}
+
+      {/* TAB PANEL: FLASHCARDS */}
+      {activeTab === "flashcards" && (
+        <div
+          id="panel-flashcards"
+          role="tabpanel"
+          aria-labelledby="tab-flashcards"
+          className="flex flex-col gap-6"
+        >
+          <Section title="Flashcards" count={flashcards.length}>
+            {flashcards.length > 0 ? (
+              <ul className="grid gap-3 sm:grid-cols-2">
+                {flashcards.map((card) => (
+                  <li key={card.id}>
+                    <Card className="flex h-full flex-col gap-3 p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Front
+                        </span>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {card.pinned ? <Badge tone="amber">Pinned</Badge> : null}
+                          {card.origin === "user" ? <Badge tone="purple">Yours</Badge> : null}
+                          {card.edited ? <Badge tone="blue">Edited</Badge> : null}
+                        </div>
+                      </div>
+                      <p className="text-sm font-medium text-slate-900">{card.front}</p>
+
+                      <details className="mt-auto rounded-md border border-slate-200 bg-slate-50 p-3">
+                        <summary className="cursor-pointer text-xs font-medium text-blue-700">
+                          Show back
+                        </summary>
+                        <p className="mt-2 whitespace-pre-line text-sm text-slate-800">
+                          {card.back}
+                        </p>
+                      </details>
+                    </Card>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-slate-500">
+                No flashcards in this kit yet. They&apos;re generated alongside questions.
+              </p>
+            )}
+          </Section>
+
+          <p className="text-sm text-slate-600">
+            Want to drill these?{" "}
+            <LinkButton href={`/kits/${kitId}/practice`} variant="secondary">
+              Practice Mode
+            </LinkButton>
+          </p>
         </div>
       )}
 

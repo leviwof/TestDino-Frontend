@@ -267,6 +267,19 @@ export interface KitQuestion {
   order?: number;
 }
 
+export interface KitFlashcard {
+  id: string;
+  front: string;
+  back: string;
+  requirement_ids?: string[];
+  category?: string;
+  difficulty?: number;
+  origin?: QuestionOrigin;
+  edited?: boolean;
+  pinned?: boolean;
+  order?: number;
+}
+
 export interface KitScheduleDay {
   day: number;
   focus: string;
@@ -286,6 +299,7 @@ export interface KitDetails {
     requirements: KitRequirement[];
   };
   questions?: KitQuestion[];
+  flashcards?: KitFlashcard[];
   schedule?: { days_available: number; days: KitScheduleDay[] };
   coverage?: { uncovered_requirement_ids: string[]; passes: number };
 }
