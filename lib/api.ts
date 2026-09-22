@@ -636,3 +636,36 @@ export async function getPracticeItems(kitId: string): Promise<PracticeItem[]> {
 
   return body?.items ?? body?.practice ?? body?.practiceItems ?? [];
 }
+
+/**
+ * POST /kits/:id/practice/:itemId — persist a self-rated confidence (1–5) for
+ * one item, marking it seen. Lets coverage survive reloads and future sessions.
+ */
+export async function recordPractice(
+  kitId: string,
+  itemId: string,
+  confidence: number,
+): Promise<void> {
+  const headers = await getAuthHeaders();
+  let res: Response;
+  try {
+    res = await fetch(
+      `${API_BASE_URL}/kits/${encodeURIComponent(kitId)}/practice/${encodeURIComponent(itemId)}`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", ...headers },
+        body: JSON.stringify({ confidence }),
+      },
+    );
+  } catch {
+    throw new ApiError(
+      "Could not reach the server. Check your connection and try again.",
+      0,
+      "network_error",
+    );
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new ApiError(messageForError(res.status, body), res.status, body?.error?.code);
+  }
+}

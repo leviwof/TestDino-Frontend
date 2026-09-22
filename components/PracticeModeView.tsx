@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   ApiError,
   getPracticeItems,
+  recordPractice,
   type PracticeItem,
 } from "@/lib/api";
 import { Badge } from "@/components/Badge";
@@ -74,6 +75,7 @@ export function PracticeModeView({ kitId, initialItems }: PracticeModeViewProps)
   const [selectedConfidence, setSelectedConfidence] = useState<number | null>(null);
   const [showAnswer, setShowAnswer] = useState<boolean>(false);
   const [isCompleted, setIsCompleted] = useState<boolean>(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Fetch practice items from the API
   useEffect(() => {
@@ -133,6 +135,21 @@ export function PracticeModeView({ kitId, initialItems }: PracticeModeViewProps)
     const finalRating = selectedConfidence ?? currentItem.confidence ?? 3;
     const updatedRatings = { ...sessionRatings, [currentItem.id]: finalRating };
     setSessionRatings(updatedRatings);
+
+    // Persist coverage so it survives reloads. Only when the user actually rated
+    // this item; fire-and-forget so navigation stays snappy.
+    if (selectedConfidence !== null) {
+      const ratedId = currentItem.id;
+      const rating = selectedConfidence;
+      setItems((prev) =>
+        prev.map((it) =>
+          it.id === ratedId ? { ...it, seen: true, confidence: rating } : it,
+        ),
+      );
+      recordPractice(kitId, ratedId, rating).catch(() => {
+        setSaveError("Couldn't save your last rating. Your progress may not persist.");
+      });
+    }
 
     if (currentIndex + 1 >= items.length) {
       // Completed all items!
@@ -480,6 +497,12 @@ export function PracticeModeView({ kitId, initialItems }: PracticeModeViewProps)
             })}
           </div>
         </fieldset>
+
+        {saveError ? (
+          <p role="alert" className="text-xs font-medium text-amber-700">
+            {saveError}
+          </p>
+        ) : null}
 
         {/* Navigation & Submit Controls */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-6">
