@@ -9,6 +9,7 @@ import {
   type KitDetails,
   type KitQuestion,
   type KitRequirement,
+  type RegenerateSection,
 } from "@/lib/api";
 import { Badge } from "@/components/Badge";
 import { Card } from "@/components/Card";
@@ -111,6 +112,8 @@ export function KitDetailsView({ kitId }: { kitId: string }) {
   const [reloadKey, setReloadKey] = useState(0);
   const [regenPhase, setRegenPhase] = useState<RegenPhase>("idle");
   const [regenError, setRegenError] = useState<string | null>(null);
+  // Which single section is currently regenerating (null = none).
+  const [sectionRegen, setSectionRegen] = useState<RegenerateSection | null>(null);
 
   // Tab navigation state
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
@@ -173,6 +176,36 @@ export function KitDetailsView({ kitId }: { kitId: string }) {
       setRegenPhase("idle");
     }
   };
+
+  // Regenerate a single section, leaving edits in every other section intact.
+  const regenerateSection = async (section: RegenerateSection) => {
+    setRegenError(null);
+    setSectionRegen(section);
+    try {
+      await regenerateKit(kitId, section);
+      setReloadKey((k) => k + 1);
+    } catch (err) {
+      setRegenError(
+        err instanceof ApiError
+          ? err.message
+          : "Failed to regenerate this section. Please try again.",
+      );
+    } finally {
+      setSectionRegen(null);
+    }
+  };
+
+  // Compact "regenerate just this section" button, reused across tabs.
+  const sectionRegenButton = (section: RegenerateSection, label = "Regenerate section") => (
+    <button
+      type="button"
+      onClick={() => regenerateSection(section)}
+      disabled={sectionRegen !== null || regenPhase !== "idle"}
+      className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      {sectionRegen === section ? "Regenerating…" : label}
+    </button>
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -535,6 +568,10 @@ export function KitDetailsView({ kitId }: { kitId: string }) {
             </Card>
           </div>
 
+          <div className="flex justify-end">
+            {sectionRegenButton("company_brief", "Regenerate brief")}
+          </div>
+
           {/* Company Brief */}
           <Section title="Company Brief">
             {kit.company_brief ? (
@@ -660,7 +697,10 @@ export function KitDetailsView({ kitId }: { kitId: string }) {
                 </p>
               </div>
 
-              <AddQuestionForm kitId={kitId} onQuestionAdded={handleQuestionAdded} />
+              <div className="flex items-center gap-2">
+                {sectionRegenButton("questions", "Regenerate questions")}
+                <AddQuestionForm kitId={kitId} onQuestionAdded={handleQuestionAdded} />
+              </div>
             </div>
 
             {/* Quick scanning tools: Search & Filters */}
@@ -798,6 +838,10 @@ export function KitDetailsView({ kitId }: { kitId: string }) {
           aria-labelledby="tab-flashcards"
           className="flex flex-col gap-6"
         >
+          <div className="flex justify-end">
+            {sectionRegenButton("flashcards", "Regenerate flashcards")}
+          </div>
+
           <Section title="Flashcards" count={flashcards.length}>
             {flashcards.length > 0 ? (
               <ul className="grid gap-3 sm:grid-cols-2">
@@ -852,6 +896,10 @@ export function KitDetailsView({ kitId }: { kitId: string }) {
           aria-labelledby="tab-schedule"
           className="flex flex-col gap-6"
         >
+          <div className="flex justify-end">
+            {sectionRegenButton("schedule", "Regenerate schedule")}
+          </div>
+
           <Section title="Preparation Schedule">
             {kit.schedule && kit.schedule.days.length > 0 ? (
               <ul className="flex flex-col gap-3">

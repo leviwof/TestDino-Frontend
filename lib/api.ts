@@ -378,16 +378,34 @@ export async function getKit(kitId: string): Promise<KitDetails> {
 export interface RegenerateResult {
   id?: string;
   jobId?: string;
+  section?: string | null;
 }
 
-/** POST /kits/:id/regenerate — re-generate a kit (preserving edited/pinned items). */
-export async function regenerateKit(kitId: string): Promise<RegenerateResult> {
+/** Sections that can be regenerated independently. */
+export type RegenerateSection =
+  | "company_brief"
+  | "role"
+  | "questions"
+  | "flashcards"
+  | "schedule"
+  | "coverage";
+
+/**
+ * POST /kits/:id/regenerate — re-generate a kit (preserving edited/pinned items).
+ * Pass a `section` to regenerate only that part; edits in other sections are
+ * left untouched. Omit it to regenerate the whole kit.
+ */
+export async function regenerateKit(
+  kitId: string,
+  section?: RegenerateSection,
+): Promise<RegenerateResult> {
   const headers = await getAuthHeaders();
   let res: Response;
   try {
     res = await fetch(`${API_BASE_URL}/kits/${encodeURIComponent(kitId)}/regenerate`, {
       method: "POST",
-      headers,
+      headers: { "content-type": "application/json", ...headers },
+      body: JSON.stringify(section ? { section } : {}),
     });
   } catch {
     throw new ApiError(
@@ -397,7 +415,12 @@ export async function regenerateKit(kitId: string): Promise<RegenerateResult> {
     );
   }
 
-  type RegenResponse = { id?: string; jobId?: string; error?: { code?: string; message?: string } };
+  type RegenResponse = {
+    id?: string;
+    jobId?: string;
+    section?: string | null;
+    error?: { code?: string; message?: string };
+  };
   let body: RegenResponse | null = null;
   try {
     body = (await res.json()) as RegenResponse;
@@ -414,7 +437,7 @@ export async function regenerateKit(kitId: string): Promise<RegenerateResult> {
     throw new ApiError(message, res.status, body?.error?.code);
   }
 
-  return { id: body?.id, jobId: body?.jobId };
+  return { id: body?.id, jobId: body?.jobId, section: body?.section ?? null };
 }
 
 export interface CreateKitInput {
