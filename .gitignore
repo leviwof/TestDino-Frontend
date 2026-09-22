@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+build/
+
+# Environment files (no secrets belong here; the API URL is public but keep
+# local overrides out of git)
+.env
+.env.local
+.env.*.local
+
+# Logs and debug
+*.log
+npm-debug.log*
+
+# System and editor
+.DS_Store
+*.tsbuildinfo
+.vscode/
+.idea/
+
+# Test coverage
+/coverage/

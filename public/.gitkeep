@@ -1,0 +1,3 @@
+# Served as static assets from the site root by `next start`.
+# This placeholder keeps the directory in version control so the production
+# Docker build can always copy it.
